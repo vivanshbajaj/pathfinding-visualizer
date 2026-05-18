@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pathfinding Visualizer</title>
+    <style>
+        /* Global Dark Mode Theme */
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            background-color: #0f172a; 
+            color: #f8fafc; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 5px; background: linear-gradient(to right, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.2rem; }
+        p { color: #94a3b8; margin-top: 0; margin-bottom: 25px; }
+
+        /* Control Panel Styling */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        button, select {
+            background-color: #1e293b;
+            color: white;
+            border: 1px solid #334155;
+            padding: 10px 18px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover, select:hover { border-color: #3b82f6; }
+        select:disabled { opacity: 0.5; cursor: not-allowed; border-color: #334155; }
+        button.run-btn { background-color: #3b82f6; border-color: #3b82f6; }
+        button.run-btn:hover { background-color: #2563eb; }
+
+        /* Grid Matrix Layout */
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(20, 25px); 
+            grid-gap: 1px;
+            background-color: #334155; 
+            border: 4px solid #1e293b;
+            border-radius: 8px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .cell {
+            width: 25px;
+            height: 25px;
+            background-color: #1e293b; 
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        /* Core Node Colors */
+        .wall { background-color: #64748b; transform: scale(0.9); border-radius: 2px; transition: all 0.1s ease; }
+        .start { background-color: #10b981; box-shadow: 0 0 12px #10b981; } 
+        .target { background-color: #ef4444; box-shadow: 0 0 12px #ef4444; } 
+
+        .visited {
+            animation: visitedWave 0.5s ease-out forwards;
+        }
+
+        /* Shortest Path Colors */
+        .path-yellow { animation: shortestPathYellow 0.4s ease-in-out forwards; }
+        .path-cyan { animation: shortestPathCyan 0.4s ease-in-out forwards; }
+        .path-pink { animation: shortestPathPink 0.4s ease-in-out forwards; }
+
+        @keyframes visitedWave {
+            0% { transform: scale(0.3); background-color: rgba(59, 130, 246, 0.6); border-radius: 100%; }
+            50% { background-color: rgba(139, 92, 246, 0.8); }
+            100% { transform: scale(1); background-color: rgba(147, 51, 234, 0.65); }
+        }
+
+        @keyframes shortestPathYellow {
+            0% { transform: scale(0.4); background-color: #f59e0b; }
+            100% { transform: scale(1); background-color: #eab308; box-shadow: 0 0 10px #eab308; }
+        }
+        @keyframes shortestPathCyan {
+            0% { transform: scale(0.4); background-color: #22d3ee; }
+            100% { transform: scale(1); background-color: #06b6d4; box-shadow: 0 0 10px #06b6d4; }
+        }
+        @keyframes shortestPathPink {
+            0% { transform: scale(0.4); background-color: #f472b6; }
+            100% { transform: scale(1); background-color: #ec4899; box-shadow: 0 0 10px #ec4899; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pathfinding Visualizer</h1>
+    <p>BFS/DFS: 1 Target (Yellow Path) || Dijkstra: 3 Targets (Yellow, Cyan, and Pink Paths)</p>
+    
+    <div class="controls">
+        <select id="algoSelect" onchange="handleAlgoSwitch()">
+            <option value="bfs">BFS (Breadth-First Search)</option>
+            <option value="dfs">DFS (Depth-First Search)</option>
+            <option value="dijkstra">Dijkstra's Algorithm</option>
+        </select>
+        <button class="run-btn" onclick="runPipeline()">Run Visualizer</button>
+        <button onclick="generateRandomMaze()">Generate New Maze</button>
+        <button onclick="clearVisuals()">Clear Path</button>
+        <button onclick="resetBoard()">Reset All</button>
+    </div>
+
+    <div id="grid"></div>
+
+    <script>
+        const gridElement = document.getElementById('grid');
+        const algoSelect = document.getElementById('algoSelect');
+        const rows = 20;
+        const cols = 20;
+        const totalCells = rows * cols;
+
+        const startNodeIndex = 44;   
+        const allTargetIndices = [135, 343, 355]; 
+
+        const cellsArray = [];
+        const isWall = new Array(totalCells).fill(false);
+        
+        let isAnimating = false;
+        let animationTimeouts = []; // Array tracking active background timer instances
+
+        // 1. Build Grid Framework
+        for (let i = 0; i < totalCells; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            if (i === startNodeIndex) cell.classList.add('start');
+
+            cell.addEventListener('click', () => {
+                if (!isAnimating && i !== startNodeIndex && !allTargetIndices.includes(i)) {
+                    isWall[i] = !isWall[i];
+                    cell.classList.toggle('wall');
+                }
+            });
+
+            gridElement.appendChild(cell);
+            cellsArray.push(cell);
+        }
+
+        // 2. Clear Active Timers Hub
+        function stopAllAnimations() {
+            animationTimeouts.forEach(id => clearTimeout(id));
+            animationTimeouts = [];
+            isAnimating = false;
+            algoSelect.disabled = false; // Always release drop-down control state
+        }
+
+        // 3. Algorithm Environmental Switch Controller
+        function handleAlgoSwitch() {
+            if (isAnimating) return;
+            
+            const selectedAlgo = algoSelect.value;
+            if (selectedAlgo === 'bfs' || selectedAlgo === 'dfs') {
+                cellsArray[allTargetIndices[0]].classList.remove('target');
+                cellsArray[allTargetIndices[1]].classList.remove('target');
+                cellsArray[allTargetIndices[2]].classList.add('target');
+            } else if (selectedAlgo === 'dijkstra') {
+                allTargetIndices.forEach(idx => cellsArray[idx].classList.add('target'));
+            }
+        }
+
+        // Maze Generator 
+        function generateRandomMaze() {
+            clearVisuals(); // Automatically halts ongoing pipelines and unlocks dropdown
+            
+            for (let i = 0; i < totalCells; i++) {
+                if (i === startNodeIndex || allTargetIndices.includes(i)) continue;
+                if (Math.random() < 0.28) {
+                    isWall[i] = true;
+                    cellsArray[i].classList.add('wall');
+                } else {
+                    isWall[i] = false;
+                    cellsArray[i].classList.remove('wall');
+                }
+            }
+        }
+
+        // 4. Main Operational Pipeline
+        function runPipeline() {
+            if (isAnimating) return;
+            clearVisuals();
+            
+            isAnimating = true;
+            algoSelect.disabled = true; // Strict lockdown implementation
+
+            const selectedAlgo = algoSelect.value;
+            let visitedOrder = [];
+            let parentMap = new Array(totalCells).fill(null);
+            let foundTargets = [];
+
+            if (selectedAlgo === 'bfs') {
+                let found = executeBFS(visitedOrder, parentMap);
+                if (found) foundTargets.push(355);
+            } else if (selectedAlgo === 'dfs') {
+                let found = executeDFS(visitedOrder, parentMap);
+                if (found) foundTargets.push(355);
+            } else if (selectedAlgo === 'dijkstra') {
+                executeDijkstra(visitedOrder, parentMap, foundTargets);
+            }
+
+            animateEngine(visitedOrder, parentMap, foundTargets);
+        }
+
+        function getNeighbors(curr) {
+            const r = Math.floor(curr / cols);
+            const c = curr % cols;
+            const neighbors = [];
+            const dr = [-1, 0, 1, 0];
+            const dc = [0, 1, 0, -1];
+
+            for (let i = 0; i < 4; i++) {
+                const nr = r + dr[i];
+                const nc = c + dc[i];
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                    neighbors.push(nr * cols + nc);
+                }
+            }
+            return neighbors;
+        }
+
+        function executeBFS(visitedOrder, parentMap) {
+            const queue = [startNodeIndex];
+            const visited = new Array(totalCells).fill(false);
+            visited[startNodeIndex] = true;
+            const target = 355;
+
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                if (curr === target) return true;
+                if (curr !== startNodeIndex) visitedOrder.push(curr);
+
+                for (const neighbor of getNeighbors(curr)) {
+                    if (!visited[neighbor] && !isWall[neighbor]) {
+                        visited[neighbor] = true;
+                        parentMap[neighbor] = curr;
+                        queue.push(neighbor);
+                    }
+                }
+            }
+            return false;
+        }
+
+        function executeDFS(visitedOrder, parentMap) {
+            const stack = [startNodeIndex];
+            const visited = new Array(totalCells).fill(false);
+            const target = 355;
+
+            while (stack.length > 0) {
+                const curr = stack.pop();
+                if (curr === target) return true;
+
+                if (!visited[curr]) {
+                    visited[curr] = true;
+                    if (curr !== startNodeIndex) visitedOrder.push(curr);
+
+                    for (const neighbor of getNeighbors(curr)) {
+                        if (!visited[neighbor] && !isWall[neighbor]) {
+                            parentMap[neighbor] = curr;
+                            stack.push(neighbor);
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function executeDijkstra(visitedOrder, parentMap, foundTargets) {
+            const dist = new Array(totalCells).fill(Infinity);
+            const visited = new Array(totalCells).fill(false);
+            dist[startNodeIndex] = 0;
+            const targetsToFind = new Set(allTargetIndices);
+
+            for (let i = 0; i < totalCells; i++) {
+                let u = -1;
+                for (let j = 0; j < totalCells; j++) {
+                    if (!visited[j] && (u === -1 || dist[j] < dist[u])) u = j;
+                }
+
+                if (u === -1 || dist[u] === Infinity) break;
+                visited[u] = true;
+
+                if (targetsToFind.has(u)) {
+                    foundTargets.push(u);
+                    targetsToFind.delete(u);
+                    if (targetsToFind.size === 0) break;
+                }
+
+                if (u !== startNodeIndex && !allTargetIndices.includes(u)) {
+                    visitedOrder.push(u);
+                }
+
+                for (const v of getNeighbors(u)) {
+                    if (!isWall[v] && !visited[v]) {
+                        if (dist[u] + 1 < dist[v]) {
+                            dist[v] = dist[u] + 1;
+                            parentMap[v] = u;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Trace Vector Animations Hub
+        function animateEngine(visitedOrder, parentMap, foundTargets) {
+            const selectedAlgo = algoSelect.value;
+            for (let i = 0; i < visitedOrder.length; i++) {
+                let tId = setTimeout(() => {
+                    const idx = visitedOrder[i];
+                    cellsArray[idx].classList.add('visited');
+
+                    if (i === visitedOrder.length - 1) {
+                        if (foundTargets.length > 0) animateShortestPaths(parentMap, foundTargets, selectedAlgo);
+                        else {
+                            isAnimating = false;
+                            algoSelect.disabled = false;
+                        }
+                    }
+                }, i * 12);
+                animationTimeouts.push(tId);
+            }
+            if (visitedOrder.length === 0) {
+                if (foundTargets.length > 0) animateShortestPaths(parentMap, foundTargets, selectedAlgo);
+                else {
+                    isAnimating = false;
+                    algoSelect.disabled = false;
+                }
+            }
+        }
+
+        function animateShortestPaths(parentMap, foundTargets, selectedAlgo) {
+            let paths = foundTargets.map(target => {
+                let p = [];
+                let curr = parentMap[target];
+                while (curr !== null && curr !== startNodeIndex) {
+                    p.push(curr);
+                    curr = parentMap[curr];
+                }
+                return { targetId: target, nodes: p.reverse() };
+            });
+
+            let maxPathLength = Math.max(...paths.map(p => p.nodes.length), 0);
+
+            for (let step = 0; step < maxPathLength; step++) {
+                let tId = setTimeout(() => {
+                    for (let p of paths) {
+                        if (step < p.nodes.length) {
+                            const idx = p.nodes[step];
+                            cellsArray[idx].classList.remove('visited');
+                            
+                            if (selectedAlgo === 'dijkstra') {
+                                if (p.targetId === 355) cellsArray[idx].classList.add('path-yellow'); 
+                                else if (p.targetId === 135) cellsArray[idx].classList.add('path-cyan');   
+                                else if (p.targetId === 343) cellsArray[idx].classList.add('path-pink');   
+                            } else {
+                                cellsArray[idx].classList.add('path-yellow'); 
+                            }
+                        }
+                    }
+                    if (step === maxPathLength - 1) {
+                        isAnimating = false;
+                        algoSelect.disabled = false; // Release lock on standard complete termination
+                    }
+                }, step * 35);
+                animationTimeouts.push(tId);
+            }
+        }
+
+        function clearVisuals() {
+            stopAllAnimations(); // Safely kills browser execution queues instantly
+            for (let i = 0; i < totalCells; i++) {
+                cellsArray[i].classList.remove('visited', 'path-yellow', 'path-cyan', 'path-pink');
+            }
+        }
+
+        function resetBoard() {
+            stopAllAnimations();
+            isWall.fill(false);
+            for (let i = 0; i < totalCells; i++) {
+                cellsArray[i].className = 'cell';
+                if (i === startNodeIndex) cellsArray[i].classList.add('start');
+            }
+            generateRandomMaze(); // Automatically triggers clear and fresh render profiles
+            handleAlgoSwitch(); 
+        }
+
+        generateRandomMaze();
+        handleAlgoSwitch();
+    </script>
+</body>
+</html>
