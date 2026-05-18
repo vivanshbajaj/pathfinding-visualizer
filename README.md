@@ -1,25 +1,28 @@
-# Real-Time Pathfinding Visualizer
+# Pathfinding Visualizer
 
-A high-performance, browser-native pathfinding engine built to visualize classic graph traversal and shortest-path algorithms. The environment dynamically adapts its structure, constraints, and rendering layers based on the selected algorithm.
+A client-side web application that visualizes Breadth-First Search (BFS), Depth-First Search (DFS), and Dijkstra's algorithm on a 20x20 grid.
 
-## 🚀 Live Demo
-Experience the pipeline live on the web: 
-👉 [https://vivanshbajaj.github.io/pathfinding-visualizer/](https://vivanshbajaj.github.io/pathfinding-visualizer/)
+## Live Demo
+You can run the visualizer live here: [https://vivanshbajaj.github.io/pathfinding-visualizer/](https://vivanshbajaj.github.io/pathfinding-visualizer/)
 
-## 🛠️ Core Engineering Features
+## Features
 
-- **Dynamic Grid Environment:** Runs a responsive 20x20 matrix with automated obstacle distribution (28% density system maze generator) while maintaining deterministic layout boundaries.
-- **Asynchronous Execution Architecture:** Employs a background tracking array (`animationTimeouts`) that strictly locks down user dropdown controls mid-run, preventing event-loop race conditions. 
-- **Algorithm Configurations:**
-  - **BFS / DFS (Single-Target Model):** Hard-locked to 1 Start (Green) and 1 End (Red) node, tracing the single shortest path in clean **Yellow**.
-  - **Dijkstra's Algorithm (Multi-Target SSSP Tree):** Scales seamlessly to 1 Start and 3 separate End points, executing parallel backtracking vectors to animate isolated routes concurrently using distinct color pipelines (**Yellow, Electric Cyan, and Neon Pink**).
+* **Algorithmic Behavior:**
+    * **BFS & DFS:** Finds a path from the source to a single destination, rendering the final path in yellow.
+    * **Dijkstra's Algorithm:** Solves the Single-Source Shortest Path (SSSP) problem for 3 separate destinations concurrently. Each destination's path is tracked independently and rendered in a unique color (Yellow, Cyan, and Pink).
+* **Grid Interactions:**
+    * Manual wall allocation via cell clicking.
+    * Automated random maze generation using a 28% wall density constraint, automatically skipping start and target nodes.
+* **State Locking & Cleanup:** Prevents asynchronous race conditions by disabling the algorithm selector during runtime execution. Interaction with clear or reset triggers clears all active `setTimeout` identifiers to halt ongoing animation queues instantly.
 
-## 🧰 Tech Stack
-- **Structure:** HTML5 (Native DOM node generation)
-- **Styling & Animations:** CSS3 (GPU-accelerated custom `@keyframes` for structural wave fluids)
-- **Engine Logic:** Vanilla JavaScript (ES6+ asynchronous timers and matrix relaxation logic)
+## Tech Stack
 
-## 💻 Running Locally
+* **HTML5:** Dynamic DOM element generation for the grid canvas.
+* **CSS3:** Custom `@keyframes` animations to handle the search frontier wave and shortest path highlights.
+* **JavaScript (ES6):** Pure vanilla implementation of graph theory algorithms and asynchronous animation loops.
+
+## Local Setup
+
 1. Clone the repository:
    ```bash
    git clone [https://github.com/vivanshbajaj/pathfinding-visualizer.git](https://github.com/vivanshbajaj/pathfinding-visualizer.git)
