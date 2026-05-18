@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Pathfinding Visualizer</title>
     <style>
-        /* Global Dark Mode Theme */
         body { 
             font-family: system-ui, -apple-system, sans-serif; 
             background-color: #0f172a; 
@@ -19,7 +18,6 @@
         h1 { margin-bottom: 5px; background: linear-gradient(to right, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.2rem; }
         p { color: #94a3b8; margin-top: 0; margin-bottom: 25px; }
 
-        /* Control Panel Styling */
         .controls {
             display: flex;
             gap: 12px;
@@ -40,7 +38,6 @@
         button.run-btn { background-color: #3b82f6; border-color: #3b82f6; }
         button.run-btn:hover { background-color: #2563eb; }
 
-        /* Grid Matrix Layout */
         #grid {
             display: grid;
             grid-template-columns: repeat(20, 25px); 
@@ -58,7 +55,6 @@
             box-sizing: border-box;
         }
 
-        /* Core Node Colors */
         .wall { background-color: #64748b; transform: scale(0.9); border-radius: 2px; transition: all 0.1s ease; }
         .start { background-color: #10b981; box-shadow: 0 0 12px #10b981; } 
         .target { background-color: #ef4444; box-shadow: 0 0 12px #ef4444; } 
@@ -67,7 +63,6 @@
             animation: visitedWave 0.5s ease-out forwards;
         }
 
-        /* Shortest Path Colors */
         .path-yellow { animation: shortestPathYellow 0.4s ease-in-out forwards; }
         .path-cyan { animation: shortestPathCyan 0.4s ease-in-out forwards; }
         .path-pink { animation: shortestPathPink 0.4s ease-in-out forwards; }
@@ -98,13 +93,13 @@
     <p>BFS/DFS: 1 Target (Yellow Path) || Dijkstra: 3 Targets (Yellow, Cyan, and Pink Paths)</p>
     
     <div class="controls">
-        <select id="algoSelect" onchange="handleAlgoSwitch()">
+        <select id="algoSelect" onchange="updateTargets()">
             <option value="bfs">BFS (Breadth-First Search)</option>
             <option value="dfs">DFS (Depth-First Search)</option>
             <option value="dijkstra">Dijkstra's Algorithm</option>
         </select>
-        <button class="run-btn" onclick="runPipeline()">Run Visualizer</button>
-        <button onclick="generateRandomMaze()">Generate New Maze</button>
+        <button class="run-btn" onclick="startVisualizer()">Run Visualizer</button>
+        <button onclick="generateMaze()">Generate New Maze</button>
         <button onclick="clearVisuals()">Clear Path</button>
         <button onclick="resetBoard()">Reset All</button>
     </div>
@@ -112,100 +107,91 @@
     <div id="grid"></div>
 
     <script>
-        const gridElement = document.getElementById('grid');
+        const grid = document.getElementById('grid');
         const algoSelect = document.getElementById('algoSelect');
         const rows = 20;
         const cols = 20;
         const totalCells = rows * cols;
 
-        const startNodeIndex = 44;   
-        const allTargetIndices = [135, 343, 355]; 
+        const startNode = 44;   
+        const targets = [135, 343, 355]; 
 
-        const cellsArray = [];
+        const cells = [];
         const isWall = new Array(totalCells).fill(false);
         
         let isAnimating = false;
-        let animationTimeouts = []; // Array tracking active background timer instances
+        let timeouts = [];
 
-        // 1. Build Grid Framework
         for (let i = 0; i < totalCells; i++) {
             const cell = document.createElement('div');
             cell.classList.add('cell');
-            if (i === startNodeIndex) cell.classList.add('start');
+            if (i === startNode) cell.classList.add('start');
 
             cell.addEventListener('click', () => {
-                if (!isAnimating && i !== startNodeIndex && !allTargetIndices.includes(i)) {
+                if (!isAnimating && i !== startNode && !targets.includes(i)) {
                     isWall[i] = !isWall[i];
                     cell.classList.toggle('wall');
                 }
             });
 
-            gridElement.appendChild(cell);
-            cellsArray.push(cell);
+            grid.appendChild(cell);
+            cells.push(cell);
         }
 
-        // 2. Clear Active Timers Hub
-        function stopAllAnimations() {
-            animationTimeouts.forEach(id => clearTimeout(id));
-            animationTimeouts = [];
+        function clearTimeouts() {
+            timeouts.forEach(id => clearTimeout(id));
+            timeouts = [];
             isAnimating = false;
-            algoSelect.disabled = false; // Always release drop-down control state
+            algoSelect.disabled = false;
         }
 
-        // 3. Algorithm Environmental Switch Controller
-        function handleAlgoSwitch() {
+        function updateTargets() {
             if (isAnimating) return;
-            
-            const selectedAlgo = algoSelect.value;
-            if (selectedAlgo === 'bfs' || selectedAlgo === 'dfs') {
-                cellsArray[allTargetIndices[0]].classList.remove('target');
-                cellsArray[allTargetIndices[1]].classList.remove('target');
-                cellsArray[allTargetIndices[2]].classList.add('target');
-            } else if (selectedAlgo === 'dijkstra') {
-                allTargetIndices.forEach(idx => cellsArray[idx].classList.add('target'));
+            const algo = algoSelect.value;
+            if (algo === 'bfs' || algo === 'dfs') {
+                cells[targets[0]].classList.remove('target');
+                cells[targets[1]].classList.remove('target');
+                cells[targets[2]].classList.add('target');
+            } else if (algo === 'dijkstra') {
+                targets.forEach(idx => cells[idx].classList.add('target'));
             }
         }
 
-        // Maze Generator 
-        function generateRandomMaze() {
-            clearVisuals(); // Automatically halts ongoing pipelines and unlocks dropdown
-            
+        function generateMaze() {
+            clearVisuals();
             for (let i = 0; i < totalCells; i++) {
-                if (i === startNodeIndex || allTargetIndices.includes(i)) continue;
+                if (i === startNode || targets.includes(i)) continue;
                 if (Math.random() < 0.28) {
                     isWall[i] = true;
-                    cellsArray[i].classList.add('wall');
+                    cells[i].classList.add('wall');
                 } else {
                     isWall[i] = false;
-                    cellsArray[i].classList.remove('wall');
+                    cells[i].classList.remove('wall');
                 }
             }
         }
 
-        // 4. Main Operational Pipeline
-        function runPipeline() {
+        function startVisualizer() {
             if (isAnimating) return;
             clearVisuals();
             
             isAnimating = true;
-            algoSelect.disabled = true; // Strict lockdown implementation
+            algoSelect.disabled = true;
 
-            const selectedAlgo = algoSelect.value;
+            const algo = algoSelect.value;
             let visitedOrder = [];
-            let parentMap = new Array(totalCells).fill(null);
+            let parent = new Array(totalCells).fill(null);
             let foundTargets = [];
 
-            if (selectedAlgo === 'bfs') {
-                let found = executeBFS(visitedOrder, parentMap);
-                if (found) foundTargets.push(355);
-            } else if (selectedAlgo === 'dfs') {
-                let found = executeDFS(visitedOrder, parentMap);
-                if (found) foundTargets.push(355);
-            } else if (selectedAlgo === 'dijkstra') {
-                executeDijkstra(visitedOrder, parentMap, foundTargets);
+            if (algo === 'bfs') {
+                if (runBFS(visitedOrder, parent)) foundTargets.push(355);
+            } else if (algo === 'dfs') {
+                if (runDFS(visitedOrder, parent)) foundTargets.push(355);
+            } else if (algo === 'dijkstra') {
+                runDijkstra(visitedOrder, parent, foundTargets);
             }
 
-            animateEngine(visitedOrder, parentMap, foundTargets);
+            animate(visitedOrder, parent, foundTargets);
         }
 
         function getNeighbors(curr) {
@@ -225,21 +211,21 @@
             return neighbors;
         }
 
-        function executeBFS(visitedOrder, parentMap) {
-            const queue = [startNodeIndex];
+        function runBFS(visitedOrder, parent) {
+            const queue = [startNode];
             const visited = new Array(totalCells).fill(false);
-            visited[startNodeIndex] = true;
+            visited[startNode] = true;
             const target = 355;
 
             while (queue.length > 0) {
                 const curr = queue.shift();
                 if (curr === target) return true;
-                if (curr !== startNodeIndex) visitedOrder.push(curr);
+                if (curr !== startNode) visitedOrder.push(curr);
 
                 for (const neighbor of getNeighbors(curr)) {
                     if (!visited[neighbor] && !isWall[neighbor]) {
                         visited[neighbor] = true;
-                        parentMap[neighbor] = curr;
+                        parent[neighbor] = curr;
                         queue.push(neighbor);
                     }
                 }
@@ -247,22 +233,21 @@
             return false;
         }
 
-        function executeDFS(visitedOrder, parentMap) {
-            const stack = [startNodeIndex];
+        function runDFS(visitedOrder, parent) {
+            const stack = [startNode];
             const visited = new Array(totalCells).fill(false);
-            const target = 355;
 
             while (stack.length > 0) {
                 const curr = stack.pop();
-                if (curr === target) return true;
+                if (curr === 355) return true;
 
                 if (!visited[curr]) {
                     visited[curr] = true;
-                    if (curr !== startNodeIndex) visitedOrder.push(curr);
+                    if (curr !== startNode) visitedOrder.push(curr);
 
                     for (const neighbor of getNeighbors(curr)) {
                         if (!visited[neighbor] && !isWall[neighbor]) {
-                            parentMap[neighbor] = curr;
+                            parent[neighbor] = curr;
                             stack.push(neighbor);
                         }
                     }
@@ -271,11 +256,11 @@
             return false;
         }
 
-        function executeDijkstra(visitedOrder, parentMap, foundTargets) {
+        function runDijkstra(visitedOrder, parent, foundTargets) {
             const dist = new Array(totalCells).fill(Infinity);
             const visited = new Array(totalCells).fill(false);
-            dist[startNodeIndex] = 0;
-            const targetsToFind = new Set(allTargetIndices);
+            dist[startNode] = 0;
+            const targetsToFind = new Set(targets);
 
             for (let i = 0; i < totalCells; i++) {
                 let u = -1;
@@ -292,7 +277,7 @@
                     if (targetsToFind.size === 0) break;
                 }
 
-                if (u !== startNodeIndex && !allTargetIndices.includes(u)) {
+                if (u !== startNode && !targets.includes(u)) {
                     visitedOrder.push(u);
                 }
 
@@ -300,33 +285,32 @@
                     if (!isWall[v] && !visited[v]) {
                         if (dist[u] + 1 < dist[v]) {
                             dist[v] = dist[u] + 1;
-                            parentMap[v] = u;
+                            parent[v] = u;
                         }
                     }
                 }
             }
         }
 
-        // 5. Trace Vector Animations Hub
-        function animateEngine(visitedOrder, parentMap, foundTargets) {
-            const selectedAlgo = algoSelect.value;
+        function animate(visitedOrder, parent, foundTargets) {
+            const algo = algoSelect.value;
             for (let i = 0; i < visitedOrder.length; i++) {
                 let tId = setTimeout(() => {
                     const idx = visitedOrder[i];
-                    cellsArray[idx].classList.add('visited');
+                    cells[idx].classList.add('visited');
 
                     if (i === visitedOrder.length - 1) {
-                        if (foundTargets.length > 0) animateShortestPaths(parentMap, foundTargets, selectedAlgo);
+                        if (foundTargets.length > 0) animatePaths(parent, foundTargets, algo);
                         else {
                             isAnimating = false;
                             algoSelect.disabled = false;
                         }
                     }
                 }, i * 12);
-                animationTimeouts.push(tId);
+                timeouts.push(tId);
             }
             if (visitedOrder.length === 0) {
-                if (foundTargets.length > 0) animateShortestPaths(parentMap, foundTargets, selectedAlgo);
+                if (foundTargets.length > 0) animatePaths(parent, foundTargets, algo);
                 else {
                     isAnimating = false;
                     algoSelect.disabled = false;
@@ -334,64 +318,64 @@
             }
         }
 
-        function animateShortestPaths(parentMap, foundTargets, selectedAlgo) {
+        function animatePaths(parent, foundTargets, algo) {
             let paths = foundTargets.map(target => {
                 let p = [];
-                let curr = parentMap[target];
-                while (curr !== null && curr !== startNodeIndex) {
+                let curr = parent[target];
+                while (curr !== null && curr !== startNode) {
                     p.push(curr);
-                    curr = parentMap[curr];
+                    curr = parent[curr];
                 }
                 return { targetId: target, nodes: p.reverse() };
             });
 
-            let maxPathLength = Math.max(...paths.map(p => p.nodes.length), 0);
+            let maxLen = Math.max(...paths.map(p => p.nodes.length), 0);
 
-            for (let step = 0; step < maxPathLength; step++) {
+            for (let step = 0; step < maxLen; step++) {
                 let tId = setTimeout(() => {
                     for (let p of paths) {
                         if (step < p.nodes.length) {
                             const idx = p.nodes[step];
-                            cellsArray[idx].classList.remove('visited');
+                            cells[idx].classList.remove('visited');
                             
-                            if (selectedAlgo === 'dijkstra') {
-                                if (p.targetId === 355) cellsArray[idx].classList.add('path-yellow'); 
-                                else if (p.targetId === 135) cellsArray[idx].classList.add('path-cyan');   
-                                else if (p.targetId === 343) cellsArray[idx].classList.add('path-pink');   
+                            if (algo === 'dijkstra') {
+                                if (p.targetId === 355) cells[idx].classList.add('path-yellow'); 
+                                else if (p.targetId === 135) cells[idx].classList.add('path-cyan');   
+                                else if (p.targetId === 343) cells[idx].classList.add('path-pink');   
                             } else {
-                                cellsArray[idx].classList.add('path-yellow'); 
+                                cells[idx].classList.add('path-yellow'); 
                             }
                         }
                     }
-                    if (step === maxPathLength - 1) {
+                    if (step === maxLen - 1) {
                         isAnimating = false;
-                        algoSelect.disabled = false; // Release lock on standard complete termination
+                        algoSelect.disabled = false;
                     }
                 }, step * 35);
-                animationTimeouts.push(tId);
+                timeouts.push(tId);
             }
         }
 
         function clearVisuals() {
-            stopAllAnimations(); // Safely kills browser execution queues instantly
+            clearTimeouts();
             for (let i = 0; i < totalCells; i++) {
-                cellsArray[i].classList.remove('visited', 'path-yellow', 'path-cyan', 'path-pink');
+                cells[i].classList.remove('visited', 'path-yellow', 'path-cyan', 'path-pink');
             }
         }
 
         function resetBoard() {
-            stopAllAnimations();
+            clearTimeouts();
             isWall.fill(false);
             for (let i = 0; i < totalCells; i++) {
-                cellsArray[i].className = 'cell';
-                if (i === startNodeIndex) cellsArray[i].classList.add('start');
+                cells[i].className = 'cell';
+                if (i === startNode) cells[i].classList.add('start');
             }
-            generateRandomMaze(); // Automatically triggers clear and fresh render profiles
-            handleAlgoSwitch(); 
+            generateMaze();
+            updateTargets(); 
         }
 
-        generateRandomMaze();
-        handleAlgoSwitch();
+        generateMaze();
+        updateTargets();
     </script>
 </body>
 </html>
